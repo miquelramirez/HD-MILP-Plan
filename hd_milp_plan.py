@@ -315,9 +315,11 @@ def encode_activation_constraints(c, relus, bias, inputNeurons, mappings, weight
     for t in range(horizon):
         for relu in relus:
 
+            # Z(relu) >= 0.0
             row = [ [ [z[(relu,t)]], [1.0] ] ]
             c.linear_constraints.add(lin_expr=row, senses="G", rhs=[0.0])
 
+            # Z(relu) <= Z'(relu) M
             row = [ [ [z[(relu,t)], zPrime[(relu,t)]], [1.0, -1.0*bigM] ] ]
             c.linear_constraints.add(lin_expr=row, senses="L", rhs=[0.0])
 
@@ -335,9 +337,11 @@ def encode_activation_constraints(c, relus, bias, inputNeurons, mappings, weight
                     coefs.append(weights[(inp,relu)])
                     inputs.append(z[(inp,t)])
 
+            # Y <= Z(relu)
             row = [ [ inputs + [z[(relu,t)]], coefs + [-1.0] ] ]
             c.linear_constraints.add(lin_expr=row, senses="L", rhs=[RHS])
 
+            # Y - Z - z' M >= -M --> Y + M >= Z + z' M
             RHS += -1.0*bigM
             row = [ [ inputs + [z[(relu,t)]] + [zPrime[(relu,t)]], coefs + [-1.0] + [-1.0*bigM] ] ]
             c.linear_constraints.add(lin_expr=row, senses="G", rhs=[RHS])
@@ -721,6 +725,9 @@ def encode_hd_milp_plan(domain, instance, horizon, sparsification, bound):
         for t in range(horizon):
             for a in A:
                 print(("%s at time %d by: %f " % (a,t,solX[x[(a,t)]])))
+            # TODO: add switch to make it verbose
+            #for relu in relus:
+            #    print(("%s at time %d by: %f " % (relu,t,solX[z[(relu,t)]])))
             for s in S:
                 print("%s at time %d by: %f " % (s,t+1,solX[y[(s,t+1)]]))
     elif solution.get_status() == solution.status.MIP_feasible or solution.get_status() == solution.status.MIP_abort_feasible or solution.get_status() == solution.status.MIP_time_limit_feasible or solution.get_status() == solution.status.optimal_tolerance:
@@ -732,6 +739,9 @@ def encode_hd_milp_plan(domain, instance, horizon, sparsification, bound):
         for t in range(horizon):
             for a in A:
                 print(("%s at time %d by: %f " % (a,t,solX[x[(a,t)]])))
+            # TODO: add switch to make it verbose
+            #for relu in relus:
+            #    print(("%s at time %d by: %f " % (relu,t,solX[z[(relu,t)]])))
             for s in S:
                 print("%s at time %d by: %f " % (s,t+1,solX[y[(s,t+1)]]))
     elif solution.get_status() == solution.status.MIP_abort_infeasible:
