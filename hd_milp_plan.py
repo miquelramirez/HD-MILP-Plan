@@ -4,11 +4,11 @@ import cplex
 from cplex.exceptions import CplexError
 
 def sparsifyDNN(sparsificationThreshold, weights, bias, inputNeurons, mappings, relus, outputs):
-    
+
     orderedAbsWeights = sorted(map(abs, list(weights.values())+list(bias.values())))
     index = int(math.floor(sparsificationThreshold*(len(orderedAbsWeights)-1)))
     cutoffWeight = orderedAbsWeights[index]
-    
+
     for relu in relus:
         for inp in inputNeurons[(relu)]:
             if inp not in mappings:
@@ -28,15 +28,15 @@ def sparsifyDNN(sparsificationThreshold, weights, bias, inputNeurons, mappings, 
     return weights, bias
 
 def readDNN(directory):
-    
+
     inputNeurons = {}
     weights = {}
     bias = {}
     activationType = {}
-    
+
     DNNFile = open(directory,"r")
     lines = DNNFile.read().splitlines()
-    
+
     for line in lines:
         data = line.split(",")
         for index, dat in enumerate(data):
@@ -57,73 +57,73 @@ def readDNN(directory):
     return inputNeurons, weights, bias, activationType
 
 def readInitial(directory):
-    
+
     initial = []
     initialFile = open(directory,"r")
     data = initialFile.read().splitlines()
-    
+
     for dat in data:
         initial.append(dat.split(","))
 
     return initial
 
 def readGoal(directory):
-    
+
     goals = []
     goalsFile = open(directory,"r")
     data = goalsFile.read().splitlines()
-    
+
     for dat in data:
         goals.append(dat.split(","))
-    
+
     return goals
 
 def readMappings(directory):
-    
+
     mappings = {}
     mappingsFile = open(directory,"r")
     data = mappingsFile.read().splitlines()
-    
+
     for dat in data:
         key, value = dat.split(",")
         mappings[key] = value
-    
+
     return mappings
 
 def readConstraints(directory):
-    
+
     constraints = []
     constraintsFile = open(directory,"r")
     data = constraintsFile.read().splitlines()
-    
+
     for dat in data:
         constraints.append(dat.split(","))
 
     return constraints
 
 def readReward(directory):
-    
+
     reward = []
     rewardFile = open(directory,"r")
     data = rewardFile.read().splitlines()
-    
+
     for dat in data:
         reward.append(dat.split(","))
-    
+
     return reward
 
 def readVariables(directory):
-    
+
     A = []
     S = []
     Aux = []
     A_type = []
     S_type = []
     Aux_type = []
-    
+
     variablesFile = open(directory,"r")
     data = variablesFile.read().splitlines()
-    
+
     for dat in data:
         variables = dat.split(",")
         for var in variables:
@@ -161,12 +161,12 @@ def readVariables(directory):
     return A, S, Aux, A_type, S_type, Aux_type
 
 def initialize_variables(c, A, S, Aux, relus, A_type, S_type, Aux_type, horizon):
-    
+
     VARINDEX = 0
-    
+
     vartypes = ""
     colnames = []
-    
+
     # Create vars for each action a, time step t
     x = {}
     for index, a in enumerate(A):
@@ -210,13 +210,13 @@ def initialize_variables(c, A, S, Aux, relus, A_type, S_type, Aux_type, horizon)
 
     lbs = [-1.0*cplex.infinity] * VARINDEX
     ubs = [cplex.infinity] * VARINDEX
-    
+
     c.variables.add(types=vartypes, names=colnames, lb = lbs, ub = ubs)
-    
+
     return c, x, y, v, z, zPrime, vartypes, colnames
 
 def encode_initial_constraints(c, initial, y):
-    
+
     for init in initial:
         variables = init[:-2]
         literals = []
@@ -238,11 +238,11 @@ def encode_initial_constraints(c, initial, y):
         else:
             row = [ [ literals, coefs ] ]
             c.linear_constraints.add(lin_expr=row, senses="E", rhs=[RHS])
-    
+
     return c
 
 def encode_goal_constraints(c, goals, y, horizon):
-    
+
     for goal in goals:
         variables = goal[:-2]
         literals = []
@@ -268,7 +268,7 @@ def encode_goal_constraints(c, goals, y, horizon):
     return c
 
 def encode_global_constraints(c, constraints, A, S, Aux, x, y, v, horizon):
-    
+
     for t in range(horizon+1):
         for constraint in constraints:
             variables = constraint[:-2]
@@ -307,20 +307,20 @@ def encode_global_constraints(c, constraints, A, S, Aux, x, y, v, horizon):
                 else:
                     row = [ [ literals, coefs ] ]
                     c.linear_constraints.add(lin_expr=row, senses="E", rhs=[RHS])
-    
+
     return c
 
 def encode_activation_constraints(c, relus, bias, inputNeurons, mappings, weights, A, S, x, y, z, zPrime, bigM, horizon):
-    
+
     for t in range(horizon):
         for relu in relus:
-            
+
             row = [ [ [z[(relu,t)]], [1.0] ] ]
             c.linear_constraints.add(lin_expr=row, senses="G", rhs=[0.0])
-            
+
             row = [ [ [z[(relu,t)], zPrime[(relu,t)]], [1.0, -1.0*bigM] ] ]
             c.linear_constraints.add(lin_expr=row, senses="L", rhs=[0.0])
-            
+
             inputs = []
             coefs = []
             RHS = -1.0*bias[(relu)]
@@ -334,18 +334,18 @@ def encode_activation_constraints(c, relus, bias, inputNeurons, mappings, weight
                 else:
                     coefs.append(weights[(inp,relu)])
                     inputs.append(z[(inp,t)])
-        
+
             row = [ [ inputs + [z[(relu,t)]], coefs + [-1.0] ] ]
             c.linear_constraints.add(lin_expr=row, senses="L", rhs=[RHS])
-            
+
             RHS += -1.0*bigM
             row = [ [ inputs + [z[(relu,t)]] + [zPrime[(relu,t)]], coefs + [-1.0] + [-1.0*bigM] ] ]
             c.linear_constraints.add(lin_expr=row, senses="G", rhs=[RHS])
-    
+
     return c
 
 def encode_nextstate_constraints(c, outputs, bias, inputNeurons, mappings, weights, A, S, x, y, z, horizon):
-    
+
     for t in range(1,horizon+1):
         for output in outputs:
             inputs = []
@@ -361,16 +361,16 @@ def encode_nextstate_constraints(c, outputs, bias, inputNeurons, mappings, weigh
                 else:
                     coefs.append(weights[(inp,output)])
                     inputs.append(z[(inp,t-1)])
-        
+
             row = [ [ inputs + [y[(mappings[(output)],t)]], coefs + [-1.0] ] ]
             c.linear_constraints.add(lin_expr=row, senses="E", rhs=[RHS])
 
     return c
 
 def encode_reward(c, reward, colnames, A, S, Aux, x, y, v, horizon):
-    
+
     objcoefs = [0.0]*len(colnames)
-    
+
     for t in range(horizon):
         for var, weight in reward:
             if var in A or var[1:] in A:
@@ -391,19 +391,19 @@ def encode_reward(c, reward, colnames, A, S, Aux, x, y, v, horizon):
 
     for index, obj in enumerate(objcoefs):
         c.objective.set_linear([(index, obj)])
-    
+
     return c
 
 def initialize_strengthening_variables(c, colnames, A, S, A_lb, A_ub, S_lb, S_ub, horizon):
-    
+
     VARINDEX = len(colnames)
-    
+
     vartypes = ""
     colnames = []
     objcoefs = []
     lbs = []
     ubs = []
-    
+
     # Create vars for each action a, time step t
     x_plus = {}
     x_minus = {}
@@ -463,34 +463,34 @@ def initialize_strengthening_variables(c, colnames, A, S, A_lb, A_ub, S_lb, S_ub
                 VARINDEX += 1
 
     c.variables.add(types=vartypes, names=colnames, lb = lbs, ub = ubs)
-    
+
     return c, x_plus, x_minus, xPrime, y_plus, y_minus, yPrime
 
 def encode_improvedbound_constraints(c, A, S, colnames, x, y, horizon):
-    
+
     A_lb = {}
     A_ub = {}
     S_lb = {}
     S_ub = {}
-    
+
     print("Preprocessing bounds.")
-    
+
     c.set_log_stream(None)
     c.set_error_stream(None)
     c.set_warning_stream(None)
     c.set_results_stream(None)
-    
+
     # Total time allocated to preprocessing
     totaltime = 50.0
-    
+
     # Allocate time to each action per time
     timeperstep = (totaltime/10.0)/float((horizon)*len(A))
-    
+
     # Set search emphasis to improving bounds
     c.parameters.emphasis.mip.set(3)
-    
+
     # Perform reachability on state and action variables to obtain tighter bounds
-    
+
     for t in range(horizon):
         # Set time limit
         c.parameters.timelimit.set(timeperstep)
@@ -504,7 +504,7 @@ def encode_improvedbound_constraints(c, A, S, colnames, x, y, horizon):
             c.variables.set_lower_bounds([(colnames.index(str(x[(a,t)])), c.solution.MIP.get_best_objective())])
             #row = [ [ [x[(a,t)]], [1.0] ] ]
             #c.linear_constraints.add(lin_expr=row, senses="G", rhs=[c.solution.MIP.get_best_objective()])
-            
+
             objcoefs = [0.0]*len(colnames)
             objcoefs[colnames.index(str(x[(a,t)]))] = -1.0
             for index, obj in enumerate(objcoefs):
@@ -517,7 +517,7 @@ def encode_improvedbound_constraints(c, A, S, colnames, x, y, horizon):
 
     # Total time left allocated to preprocessing
     totaltime -= timeperstep*float(horizon*len(A))
-    
+
     # Allocate time to each state per time
     timeperstep = totaltime/float((horizon+1)*len(S))
 
@@ -534,7 +534,7 @@ def encode_improvedbound_constraints(c, A, S, colnames, x, y, horizon):
             c.variables.set_lower_bounds([(colnames.index(str(y[(s,t)])), c.solution.MIP.get_best_objective())])
             #row = [ [ [y[(s,t)]], [1.0] ] ]
             #c.linear_constraints.add(lin_expr=row, senses="G", rhs=[c.solution.MIP.get_best_objective()])
-            
+
             objcoefs = [0.0]*len(colnames)
             objcoefs[colnames.index(str(y[(s,t)]))] = -1.0
             for index, obj in enumerate(objcoefs):
@@ -553,7 +553,7 @@ def encode_improvedbound_constraints(c, A, S, colnames, x, y, horizon):
 
     # Reset optimizer log settings
     import sys
-    
+
     c.set_log_stream(sys.stdout)
     c.set_error_stream(sys.stderr)
     c.set_warning_stream(sys.stderr)
@@ -562,13 +562,13 @@ def encode_improvedbound_constraints(c, A, S, colnames, x, y, horizon):
     return c, A_lb, A_ub, S_lb, S_ub
 
 def encode_strengthened_activation_constraints(c, A, S, relus, bias, inputNeurons, mappings, weights, colnames, x, y, z, zPrime, horizon):
-    
+
     #Set tighter bound constraints
     c, A_lb, A_ub, S_lb, S_ub = encode_improvedbound_constraints(c, A, S, colnames, x, y, horizon)
-    
+
     #Initialize variables for strengthening constraints
     c, x_plus, x_minus, xPrime, y_plus, y_minus, yPrime = initialize_strengthening_variables(c, colnames, A, S, A_lb, A_ub, S_lb, S_ub, horizon)
-    
+
     #Add auxillary constraints to relate auxiliary variables to action and state variables
     for a in A:
         for t in range(horizon):
@@ -596,20 +596,20 @@ def encode_strengthened_activation_constraints(c, A, S, relus, bias, inputNeuron
 
                 row = [ [ [y[(s,t)]] + [yPrime[(s,t)]], [1.0] + [-1.0*S_ub[(s,t)]] ] ]
                 c.linear_constraints.add(lin_expr=row, senses="L", rhs=[0.0])
-        
+
                 row = [ [ [y[(s,t)]] + [yPrime[(s,t)]], [1.0] + [S_lb[(s,t)]] ] ]
                 c.linear_constraints.add(lin_expr=row, senses="G", rhs=[S_lb[(s,t)]])
-                
+
                 row = [ [ [y_plus[(s,t)]] + [yPrime[(s,t)]], [1.0] + [-1.0*S_ub[(s,t)]] ] ]
                 c.linear_constraints.add(lin_expr=row, senses="L", rhs=[0.0])
-                
+
                 row = [ [ [y_minus[(s,t)]] + [yPrime[(s,t)]], [1.0] + [S_lb[(s,t)]] ] ]
                 c.linear_constraints.add(lin_expr=row, senses="G", rhs=[S_lb[(s,t)]])
 
     #Add strengthened activation constraints
     for t in range(horizon):
         for relu in relus:
-        
+
             inputs = []
             coefs = []
             for inp in inputNeurons[(relu)]:
@@ -639,32 +639,32 @@ def encode_strengthened_activation_constraints(c, A, S, relus, bias, inputNeuron
                     if weights[(inp,relu)] > 0.0:
                         coefs.append(weights[(inp,relu)])
                         inputs.append(z[(inp,t)])
-                    
-    
+
+
             row = [ [ inputs + [z[(relu,t)]] + [zPrime[(relu,t)]], coefs + [-1.0] + [bias[(relu)]] ] ]
             c.linear_constraints.add(lin_expr=row, senses="G", rhs=[0.0])
 
     return c
 
 def encode_hd_milp_plan(domain, instance, horizon, sparsification, bound):
-    
+
     bigM = 1000000.0
-    
+
     inputNeurons, weights, bias, activationType = readDNN("./dnn/dnn_"+domain+"_"+instance+".txt")
     initial = readInitial("./translation/initial_"+domain+"_"+instance+".txt")
     goal = readGoal("./translation/goal_"+domain+"_"+instance+".txt")
     constraints = readConstraints("./translation/constraints_"+domain+"_"+instance+".txt")
     A, S, Aux, A_type, S_type, Aux_type = readVariables("./translation/pvariables_"+domain+"_"+instance+".txt")
     mappings = readMappings("./translation/mappings_"+domain+"_"+instance+".txt")
-    
+
     relus = [relu for relu in list(inputNeurons.keys()) if activationType[(relu)] == "relu"]
     outputs = [output for output in list(inputNeurons.keys()) if activationType[(output)] == "regular"]
-    
+
     if sparsification > 0.0:
         weights, bias = sparsifyDNN(sparsification, weights, bias, inputNeurons, mappings, relus, outputs)
 
     reward = readReward("./translation/reward_"+domain+"_"+instance+".txt")
-    
+
     # CPLEX
     c = cplex.Cplex()
 
@@ -698,42 +698,42 @@ def encode_hd_milp_plan(domain, instance, horizon, sparsification, bound):
 
     # Set time limit
     #c.parameters.timelimit.set(3600.0)
-    
+
     # Set optimality tolerance
     #c.parameters.mip.tolerances.mipgap.set(0.2)
-    
+
     c.solve()
 
     #c.write("hd_milp_plan.lp")
 
     solution = c.solution
-    
+
     print("")
 
     if solution.get_status() == solution.status.MIP_infeasible:
         print("No plans w.r.t. the given DNN exists.")
     elif solution.get_status() == solution.status.MIP_optimal:
         print("An optimal plan w.r.t. the given DNN is found:")
-        
+
         solX = solution.get_values()
-        #for s in S:
-        #    print("%s at time %d by: %f " % (s,0,solX[y[(s,0)]]))
+        for s in S:
+            print("%s at time %d by: %f " % (s,0,solX[y[(s,0)]]))
         for t in range(horizon):
             for a in A:
                 print(("%s at time %d by: %f " % (a,t,solX[x[(a,t)]])))
-            #for s in S:
-            #    print("%s at time %d by: %f " % (s,t+1,solX[y[(s,t+1)]]))
+            for s in S:
+                print("%s at time %d by: %f " % (s,t+1,solX[y[(s,t+1)]]))
     elif solution.get_status() == solution.status.MIP_feasible or solution.get_status() == solution.status.MIP_abort_feasible or solution.get_status() == solution.status.MIP_time_limit_feasible or solution.get_status() == solution.status.optimal_tolerance:
         print("A plan w.r.t. the given DNN is found:")
-        
+
         solX = solution.get_values()
-        #for s in S:
-        #    print("%s at time %d by: %f " % (s,0,solX[y[(s,0)]]))
+        for s in S:
+            print("%s at time %d by: %f " % (s,0,solX[y[(s,0)]]))
         for t in range(horizon):
             for a in A:
                 print(("%s at time %d by: %f " % (a,t,solX[x[(a,t)]])))
-            #for s in S:
-            #    print("%s at time %d by: %f " % (s,t+1,solX[y[(s,t+1)]]))
+            for s in S:
+                print("%s at time %d by: %f " % (s,t+1,solX[y[(s,t+1)]]))
     elif solution.get_status() == solution.status.MIP_abort_infeasible:
         print("Planning is interrupted by the user.")
     elif solution.get_status() == solution.status.MIP_time_limit_infeasible:
@@ -749,7 +749,7 @@ def get_args():
 
     import sys
     argv = sys.argv
-    
+
     myargs = {}
 
     for index, arg in enumerate(argv):
@@ -759,15 +759,15 @@ def get_args():
     return myargs
 
 if __name__ == '__main__':
-    
+
     myargs = get_args()
-    
+
     setDomain = False
     setInstance = False
     setHorizon = False
     setSparsification = False
     setBounds = False
-    
+
     for arg in myargs:
         if arg == "-d":
             domain = myargs[(arg)]
