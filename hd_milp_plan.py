@@ -657,8 +657,8 @@ def encode_hd_milp_plan(domain, instance, horizon, sparsification, bound):
     A, S, Aux, A_type, S_type, Aux_type = readVariables("./translation/pvariables_"+domain+"_"+instance+".txt")
     mappings = readMappings("./translation/mappings_"+domain+"_"+instance+".txt")
     
-    relus = [relu for relu in inputNeurons.keys() if activationType[(relu)] == "relu"]
-    outputs = [output for output in inputNeurons.keys() if activationType[(output)] == "regular"]
+    relus = [relu for relu in list(inputNeurons.keys()) if activationType[(relu)] == "relu"]
+    outputs = [output for output in list(inputNeurons.keys()) if activationType[(output)] == "regular"]
     
     if sparsification > 0.0:
         weights, bias = sparsifyDNN(sparsification, weights, bias, inputNeurons, mappings, relus, outputs)
@@ -720,7 +720,7 @@ def encode_hd_milp_plan(domain, instance, horizon, sparsification, bound):
         #    print("%s at time %d by: %f " % (s,0,solX[y[(s,0)]]))
         for t in range(horizon):
             for a in A:
-                print("%s at time %d by: %f " % (a,t,solX[x[(a,t)]]))
+                print(("%s at time %d by: %f " % (a,t,solX[x[(a,t)]])))
             #for s in S:
             #    print("%s at time %d by: %f " % (s,t+1,solX[y[(s,t+1)]]))
     elif solution.get_status() == solution.status.MIP_feasible or solution.get_status() == solution.status.MIP_abort_feasible or solution.get_status() == solution.status.MIP_time_limit_feasible or solution.get_status() == solution.status.optimal_tolerance:
@@ -731,7 +731,7 @@ def encode_hd_milp_plan(domain, instance, horizon, sparsification, bound):
         #    print("%s at time %d by: %f " % (s,0,solX[y[(s,0)]]))
         for t in range(horizon):
             for a in A:
-                print("%s at time %d by: %f " % (a,t,solX[x[(a,t)]]))
+                print(("%s at time %d by: %f " % (a,t,solX[x[(a,t)]])))
             #for s in S:
             #    print("%s at time %d by: %f " % (s,t+1,solX[y[(s,t+1)]]))
     elif solution.get_status() == solution.status.MIP_abort_infeasible:
@@ -739,7 +739,7 @@ def encode_hd_milp_plan(domain, instance, horizon, sparsification, bound):
     elif solution.get_status() == solution.status.MIP_time_limit_infeasible:
         print("Planning is terminated by the time limit without a plan.")
     else:
-        print("Planning is interrupted. See the status message: %d" % solution.get_status())
+        print(("Planning is interrupted. See the status message: %d" % solution.get_status()))
 
     print("")
 
@@ -791,10 +791,10 @@ if __name__ == '__main__':
         else:
             encode_hd_milp_plan(domain, instance, int(horizon), 0.0, bound)
     elif not setDomain:
-        print 'Domain is not provided.'
+        print('Domain is not provided.')
     elif not setInstance:
-        print 'Instance is not provided.'
+        print('Instance is not provided.')
     elif not setHorizon:
-        print 'Horizon is not provided.'
+        print('Horizon is not provided.')
     else:
-        print 'Bounding decision is not provided.'
+        print('Bounding decision is not provided.')
